@@ -18,13 +18,27 @@
 (s/defevent PrepareState
   {:watch (fn [_ _ _] [ZeroAmountAndIncrease ZeroQuality])})
 
-(s/defevent PrintHOHOHO
+(s/defevent AddRandomAfterWhile
   {:watch (fn [_ _ _]
             (coro (def num (math/random))
-                  (yield)
                   (loop [i :range [0 100000000]] (* i i))
-                  (yield (s/make-event {:update (fn [_ state] (update state :amount |(+ $ num)))
-                                        :effect (fn [_ _ _] (print "HOHOHO: " num))}))))})
+                  (yield (s/make-event {:update (fn [_ state] (update state :amount |(+ $ num)))}))))
+   :effect (fn [_ _ _] (print "Hard computing"))})
+
+(s/defevent UnknownCommand 
+  {:effect (fn [_ _ _] (print "Unknown command"))})
+
+(s/defevent PrintHelp
+  {:effect (fn [_ _ _]
+             (print)
+             (print "Help")
+             (print "+ add 1 to amount")
+             (print "- substract 1 from amount")
+             (print "0 make amount zero")
+             (print "s compute and add random number to amount")
+             (print "h print this help")
+             (print "q quit console")
+             (print))})
 
 (s/defevent Exit
   {:effect (fn [_ _ _] (os/exit))})

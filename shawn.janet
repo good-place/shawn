@@ -16,11 +16,11 @@
   [name fns]
   ~(def ,name (,make-event ,fns)))
 
-(defn- purge-stream [self]
+(defn- process-stream [self]
   (while (not (empty? (self :stream)))
     (:transact self (array/pop (self :stream)))))
  
-(defn- purge-pending [self]
+(defn- process-pending [self]
   (loop [p :in (self :pending)]
     (let [res (case (fiber/status p)
                 :new (resume p)
@@ -28,7 +28,7 @@
                 :dead nil)]
       (when (dictionary? res) (update self :stream |(array/push $ res)))))
   (update self :pending |(filter (fn [f] (= :pending (fiber/status f))) $))
-  (:purge-stream self))
+  (:process-stream self))
 
 (defn- notify [self]
   (unless (deep= (self :old-state) (self :state))
@@ -38,7 +38,6 @@
 (defn- transact [self event] 
   (put self :old-state (table/clone (self :state)))
   (:update event (self :state))
-  (:notify self)
   (let [watchable (:watch event (self :state) (self :stream))]
     (cond (indexed? watchable)
           (update self :stream |(array/concat $ (reverse watchable)))
@@ -47,8 +46,9 @@
           (fiber? watchable)
           (update self :pending |(array/push $ watchable))))
   (:effect event (self :state) (self :stream))
-  (:purge-stream self)
-  (:purge-pending self))
+  (:notify self)
+  (:process-stream self)
+  (:process-pending self))
 
 (defn- transact-all [self & events]
   (each event events (:transact self event)))
@@ -64,8 +64,8 @@
     :observers @[]
     :transact transact
     :transact-all transact-all
-    :purge-stream purge-stream
-    :purge-pending purge-pending
+    :process-stream process-stream
+    :process-pending process-pending
     :notify notify
     :observe observe})
 

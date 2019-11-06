@@ -10,11 +10,14 @@
                                                       (print "Oh no amount went down")))))
 (:transact s/Store e/PrepareState)
 (while true 
-  (case (string/trim (getline "Command [+ - 0 q]: "))
-    "+" (:transact s/Store e/IncreaseAmount)
-    "-" (:transact s/Store e/DecreaseAmount)
-    "s" (:transact-all s/Store e/PrintHOHOHO e/PrintHOHOHO)
-    "0" (:transact s/Store e/ZeroAmount)
-    "q" (:transact s/Store e/Exit)
-    (print "Unknown command"))
+  (def event 
+    (case (string/trim (getline "Command [+ - 0 q s h]: "))
+      "+" e/IncreaseAmount
+      "-" e/DecreaseAmount
+      "0" e/ZeroAmount
+      "s" e/AddRandomAfterWhile
+      "h" e/PrintHelp
+      "q" e/Exit
+      e/UnknownCommand))
+  (:transact s/Store event)
   (pp (s/Store :state)))
