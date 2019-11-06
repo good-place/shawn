@@ -1,13 +1,12 @@
 (import shawn :as s)
-(import events :as e )
+(import events :as e)
 
-(:observe s/Store (fn [old-state new-state] (when (< 1 (new-state :amount)) (print "Oh big amount"))))
-(:observe s/Store (fn [old-state new-state] 
-                  (when (and (old-state :amount) (new-state :amount))
-                                                     (when (< (old-state :amount) (new-state :amount))
-                                                      (print "Oh yes amount went up"))
-                                                     (when (> (old-state :amount) (new-state :amount))
-                                                      (print "Oh no amount went down")))))
+(:observe s/Store (fn [os ns] (when (< 1 (ns :amount)) (print "Oh big amount"))))
+(:observe s/Store (fn [os ns] 
+                  (when (and (os :amount) (ns :amount))
+                    (when (< (os :amount) (ns :amount)) (print "Oh yes amount went up"))
+                    (when (> (os :amount) (ns :amount)) (print "Oh no amount went down")))))
+
 (:transact s/Store e/PrepareState)
 (while true 
   (def event 
