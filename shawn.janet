@@ -43,6 +43,7 @@
       (o (self :old-state) (self :state)))))
 
 (defn- transact [self event] 
+  (when (not (event? event)) (error "Only Events are transactable"))
   (put self :old-state (table/clone (self :state)))
   (:update event (self :state))
   (let [watchable (:watch event (self :state) (self :stream))]

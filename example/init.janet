@@ -18,6 +18,7 @@
       "h" e/PrintHelp
       "q" e/Exit
       "ss" e/AddManyRandoms
+      "s100" (e/make-many-randoms-adder 100)
       e/UnknownCommand))
   (:transact s/Store event)
   (pp (s/Store :state)))

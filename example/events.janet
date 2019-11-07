@@ -12,6 +12,9 @@
 (s/defevent DecreaseAmount
   {:update (fn [_ state] (update state :amount dec))})
 
+(defn make-amount-adder [amount]
+  (s/make-event {:update (fn [_ state] (update state :amount |(+ $ amount)))}))
+
 (s/defevent ZeroAmountAndIncrease
   {:watch (fn [_ _ _] [ZeroAmount IncreaseAmount])})
 
@@ -24,11 +27,14 @@
               (var res 0)
               (loop [_ :range [0 (* (math/random) 10_000_000)]] (+= res (math/random)))
               (loop [_ :range [0 (* (math/random) 10)]] (*= res (math/random)))
-              (s/make-event {:update (fn [_ state] (update state :amount |(+ $ res)))})))
+              (make-amount-adder res)))
    :effect (fn [_ _ _] (print "Hard computing"))})
 
 (s/defevent AddManyRandoms
    {:watch (fn [_ _ _] (seq [_ :range [0 10]] AddRandom))})
+
+(defn make-many-randoms-adder [count]
+  (s/make-event {:watch (fn [_ _ _] (seq [_ :range [0 count]] AddRandom))}))
 
 (s/defevent UnknownCommand 
   {:effect (fn [_ _ _] (print "Unknown command"))})
