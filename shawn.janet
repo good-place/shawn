@@ -1,7 +1,13 @@
 (def- Event 
-  @{:update (fn update [_ state] identity)
+  @{:update (fn update [_ state])
     :watch (fn watch [_ state stream] [])
     :effect (fn effect [_ state stream])})
+
+(defn event? [e]
+  (and (dictionary? e)
+       (e :update)
+       (e :watch)
+       (e :effect)))
 
 (defn make-event 
   "Creates new event"
@@ -25,9 +31,10 @@
     (let [res (case (fiber/status p)
                 :new (resume p)
                 :pending (resume p)
+                :alive nil
                 :dead nil)]
-      (when (dictionary? res) (update self :stream |(array/push $ res)))))
-  (update self :pending |(filter (fn [f] (= :pending (fiber/status f))) $))
+      (when (event? res) (update self :stream |(array/push $ res)))))
+  (update self :pending |(filter (fn [f] (not= :dead (fiber/status f))) $))
   (:process-stream self))
 
 (defn- notify [self]
@@ -39,12 +46,14 @@
   (put self :old-state (table/clone (self :state)))
   (:update event (self :state))
   (let [watchable (:watch event (self :state) (self :stream))]
-    (cond (indexed? watchable)
-          (update self :stream |(array/concat $ (reverse watchable)))
-          (dictionary? watchable)
-          (update self :stream |(array/push $ watchable))
-          (fiber? watchable)
-          (update self :pending |(array/push $ watchable))))
+    (cond
+      (event? watchable)
+      (update self :stream |(array/push $ watchable))
+      (and (indexed? watchable) (all event? watchable))
+      (update self :stream |(array/concat $ (reverse watchable)))
+      (fiber? watchable)
+      (update self :pending |(array/push $ watchable))
+      (error (string "Watchable must be Event, Array of Events or Fiber. Got: " (type watchable)))))
   (:effect event (self :state) (self :stream))
   (:notify self)
   (:process-stream self)

@@ -1,4 +1,4 @@
-(import shawn :as s)
+(import ../shawn :as s)
 
 (s/defevent ZeroAmount 
   {:update (fn [_ state] (put state :amount 0))})
@@ -18,12 +18,17 @@
 (s/defevent PrepareState
   {:watch (fn [_ _ _] [ZeroAmountAndIncrease ZeroQuality])})
 
-(s/defevent AddRandomAfterWhile
+(s/defevent AddRandom
   {:watch (fn [_ _ _]
-            (coro (def num (math/random))
-                  (loop [i :range [0 100000000]] (* i i))
-                  (yield (s/make-event {:update (fn [_ state] (update state :amount |(+ $ num)))}))))
+            (coro 
+              (var res 0)
+              (loop [_ :range [0 (* (math/random) 10_000_000)]] (+= res (math/random)))
+              (loop [_ :range [0 (* (math/random) 10)]] (*= res (math/random)))
+              (s/make-event {:update (fn [_ state] (update state :amount |(+ $ res)))})))
    :effect (fn [_ _ _] (print "Hard computing"))})
+
+(s/defevent AddManyRandoms
+   {:watch (fn [_ _ _] (seq [_ :range [0 10]] AddRandom))})
 
 (s/defevent UnknownCommand 
   {:effect (fn [_ _ _] (print "Unknown command"))})
@@ -36,6 +41,7 @@
              (print "- substract 1 from amount")
              (print "0 make amount zero")
              (print "s compute and add random number to amount")
+             (print "ss compute and add many random numbers to amount")
              (print "h print this help")
              (print "q quit console")
              (print))})
