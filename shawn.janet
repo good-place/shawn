@@ -33,9 +33,8 @@
                 :pending (resume p)
                 :alive nil
                 :dead nil)]
-      (when (event? res) (update self :stream |(array/push $ res)))))
-  (update self :pending |(filter (fn [f] (not= :dead (fiber/status f))) $))
-  (:process-stream self))
+      (when (event? res) (:transact self res))))
+  (update self :pending |(filter (fn [f] (not= :dead (fiber/status f))) $)))
 
 (defn- notify [self]
   (unless (deep= (self :old-state) (self :state))
@@ -43,7 +42,7 @@
       (o (self :old-state) (self :state)))))
 
 (defn- transact [self event] 
-  (when (not (event? event)) (error "Only Events are transactable"))
+  (unless (event? event) (error (string "Only Events are transactable. Got: " event)))
   (put self :old-state (table/clone (self :state)))
   (:update event (self :state))
   (let [watchable (:watch event (self :state) (self :stream))]
@@ -60,9 +59,6 @@
   (:process-stream self)
   (:process-pending self))
 
-(defn- transact-all [self & events]
-  (each event events (:transact self event)))
-
 (defn- observe [self observer]
   (array/push (self :observers) observer))
 
@@ -73,7 +69,6 @@
     :pending @[]
     :observers @[]
     :transact transact
-    :transact-all transact-all
     :process-stream process-stream
     :process-pending process-pending
     :notify notify
