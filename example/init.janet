@@ -2,7 +2,7 @@
 (import ./events :as e)
 (import ./parser :as p)
 
-(def store (table/clone s/Store)) # here is possible to tailor your usage of the store
+(def store (s/init-store))
 
 (:observe store (fn [os ns] (when (< 1 (ns :amount)) (print "Oh yes big amount"))))
 (:observe store (fn [os ns] (when (> 0 (ns :amount)) (print "Oh no negative amount"))))

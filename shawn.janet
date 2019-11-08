@@ -1,3 +1,6 @@
+(defn- watchable-error [watchable]
+  (error (string "Watchable must be Event, Array of Events or Fiber. Got: " (type watchable))))
+
 (def- Event 
   @{:update (fn update [_ state])
     :watch (fn watch [_ state stream] [])
@@ -28,12 +31,14 @@
  
 (defn- process-pending [self]
   (loop [p :in (self :pending)]
-    (let [res (case (fiber/status p)
-                :new (resume p)
-                :pending (resume p)
-                :alive nil
-                :dead nil)]
-      (when (event? res) (:transact self res))))
+    (when-let [res (case (fiber/status p)
+                      :new (resume p)
+                      :pending (resume p)
+                      :alive nil
+                      :dead nil)]
+      (if (event? res) 
+        (:transact self res)
+        (watchable-error res))))
   (update self :pending |(filter (fn [f] (not= :dead (fiber/status f))) $)))
 
 (defn- notify [self]
@@ -53,7 +58,7 @@
       (update self :stream |(array/concat $ (reverse watchable)))
       (fiber? watchable)
       (update self :pending |(array/push $ watchable))
-      (error (string "Watchable must be Event, Array of Events or Fiber. Got: " (type watchable)))))
+      (watchable-error watchable)))
   (:effect event (self :state) (self :stream))
   (:notify self)
   (:process-stream self)
@@ -62,9 +67,10 @@
 (defn- observe [self observer]
   (array/push (self :observers) observer))
 
-(def Store 
-  @{:state @{}
-    :olf-state @{}
+(defn init-store [&opt state]
+  (default state @{})
+  @{:state state
+    :old-state nil
     :stream @[]
     :pending @[]
     :observers @[]

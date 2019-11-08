@@ -5,7 +5,7 @@
     :dec (* "-" -1 (constant :dec) (constant 1))
     :pinc (* "+" :spc (constant :inc) :num)
     :pdec (* "-" :spc (constant :dec) :num)
-    :zero "0"
+    :zero (* "0" -1 (constant :zero))
     :rnd (* "r" -1 (constant :rnd) (constant 1))
     :prnd (* "r" :spc (constant :rnd) :num)
     :print (* "p" -1 (constant :print))

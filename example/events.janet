@@ -45,7 +45,7 @@ Help:
 - [num] substract 1 or num from amount
 r [num] compute and add 1 or num random numbers to amount
 p print state
-h print this help")
+h print this help
 q quit console
 
 ```)
