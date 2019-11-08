@@ -17,6 +17,7 @@ You will be presented with command prompt, type `h` for help on other commands.
 
 ## TODOs
 
+- [ ] @todo add combined event test
 - [ ] @todo write down philosophy and tech
 - [ ] @todo refactor
 - [ ] @todo make fiber based only?

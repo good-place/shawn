@@ -38,7 +38,12 @@
           (:transact store TestWatchEvent)
           (deep= (store :state) @{:test "Test"})))
   (test "one effect event"
-        (pending "one effect event"))
+        (do 
+          (def store (shawn/init-store))
+          (shawn/defevent TestEffectEvent {:effect (fn [_ state _] (error "Effect triggered"))})
+          (try 
+            (:transact store TestEffectEvent)
+            ([message] (= message "Effect triggered")))))
   (test "many watch events"
         (do 
           (def store (shawn/init-store))
@@ -60,7 +65,9 @@
                                     (fn [_ _ _] 
                                       [TestUpdateEvent TesttUpdateEvent TesttUpdateEvent TesttUpdateEvent])}))) })
           (:transact store TestFiberEvent)
-          (deep= (store :state) @{:test "Testttt"}))))
+          (deep= (store :state) @{:test "Testttt"})))
+  (test "combined event"
+        (pending "combined event")))
 
 (deftest "observers"
   (test "observe" 
