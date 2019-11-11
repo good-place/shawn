@@ -13,7 +13,7 @@
 
 (:transact store e/PrepareState)
 (while true 
-  (def readout (-> "Command [+ - 0 r p q h]: " getline string/trimr string/triml))
+  (def readout (-> "Command [+ - 0 r p q h]: " getline string/trim))
   (def event 
     (if-let [[command amount] (p/parse-command readout)]
       (case command
