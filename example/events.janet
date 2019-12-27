@@ -28,7 +28,7 @@
    :effect (fn [_ _ _] (print "Hard computing"))})
 
 (defn add-many-randoms [amount]
-   (s/make-event {:watch (fn [_ _ _] (seq [_ :range [0 amount]] AddRandom))}))
+  (s/make-event {:watch (fn [_ _ _] (seq [_ :range [0 amount]] AddRandom))}))
 
 (defn make-many-randoms-adder [count]
   (s/make-event {:watch (fn [_ _ _] (seq [_ :range [0 count]] AddRandom))}))

@@ -5,7 +5,7 @@
   (print "\nPending: " message)
   :pending)
 
-(deftest "creating events"
+(deftest "events"
   (test "make-event" 
         (do 
           (def event (shawn/make-event {:update (fn [_ state] state)}))
@@ -23,13 +23,13 @@
           (shawn/defevent TestEvent {:update (fn [_ state] state)})
           (shawn/event? TestEvent))))
 
-(deftest "transacting events"
+(deftest "transact"
   (test "one update event"
         (do 
           (def store (shawn/init-store))
           (shawn/defevent TestUpdateEvent {:update (fn [_ state] (put state :test "Test"))})
           (:transact store TestUpdateEvent)
-          (deep= (store :state) @{:test "Test"})) )
+          (deep= (store :state) @{:test "Test"})))
   (test "one watch event"
         (do 
           (def store (shawn/init-store))
@@ -63,7 +63,7 @@
                (coro 
                  (shawn/make-event {:watch 
                                     (fn [_ _ _] 
-                                      [TestUpdateEvent TesttUpdateEvent TesttUpdateEvent TesttUpdateEvent])}))) })
+                                      [TestUpdateEvent TesttUpdateEvent TesttUpdateEvent TesttUpdateEvent])})))})
           (:transact store TestFiberEvent)
           (deep= (store :state) @{:test "Testttt"})))
   (test "combined event"
