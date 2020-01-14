@@ -2,9 +2,9 @@
   (error (string "Watchable must be Event, Array of Events or Fiber. Got: " (type watchable))))
 
 (def- Event 
-  @{:update (fn update [_ state])
-    :watch (fn watch [_ state stream] [])
-    :effect (fn effect [_ state stream])})
+  @{:update (fn [_ state]) 
+    :watch (fn [_ state stream] [])
+    :effect (fn [_ state stream])})
 
 (defn event? [e]
   (and (dictionary? e)
@@ -31,15 +31,20 @@
  
 (defn- process-pending [self]
   (loop [p :in (self :pending)]
-    (when-let [res (case (fiber/status p)
-                      :new (resume p)
-                      :pending (resume p)
-                      :alive nil
-                      :dead nil)]
+    (when-let [res (case (type p) 
+                         :fiber (case (fiber/status p)
+                                  :new (resume p)
+                                  :pending (resume p)
+                                  :alive nil
+                                  :dead nil)
+                         :core/thread (let [[ok v] (protect (thread/receive 0.016))]
+                                        (when ok v)))] 
       (if (event? res) 
         (:transact self res)
         (watchable-error res))))
-  (update self :pending |(filter (fn [f] (not= :dead (fiber/status f))) $)))
+  (update self :pending |(filter (fn [p] (or (= :core/thread (type p))
+                                             (and (fiber? p) 
+                                                  (not= :dead (fiber/status p))))) $)))
 
 (defn- notify [self]
   (unless (deep= (self :old-state) (self :state))
@@ -56,13 +61,14 @@
       (update self :stream |(array/push $ watchable))
       (and (indexed? watchable) (all event? watchable))
       (update self :stream |(array/concat $ (reverse watchable)))
-      (fiber? watchable)
+      (or (fiber? watchable) (= :core/thread (type watchable)))
       (update self :pending |(array/push $ watchable))
       (watchable-error watchable)))
   (:effect event (self :state) (self :stream))
   (:notify self)
   (:process-stream self)
   (:process-pending self))
+           
 
 (defn- observe [self observer]
   (array/push (self :observers) observer))

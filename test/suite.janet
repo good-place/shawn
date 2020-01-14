@@ -23,17 +23,25 @@
           (shawn/defevent TestEvent {:update (fn [_ state] state)})
           (shawn/event? TestEvent))))
 
+
+(shawn/defevent TestUpdateEvent {:update (fn [_ state] (put state :test "Test"))})
+
+(shawn/defevent TesttUpdateEvent {:update (fn [_ state] 
+                                            (update state :test |(string $ "t")))})
+
+(defn worker [m] 
+  (os/sleep 1)
+  (thread/send m TestUpdateEvent))
+
 (deftest "transact"
   (test "one update event"
         (do 
           (def store (shawn/init-store))
-          (shawn/defevent TestUpdateEvent {:update (fn [_ state] (put state :test "Test"))})
           (:transact store TestUpdateEvent)
           (deep= (store :state) @{:test "Test"})))
   (test "one watch event"
         (do 
           (def store (shawn/init-store))
-          (shawn/defevent TestUpdateEvent {:update (fn [_ state] (put state :test "Test"))})
           (shawn/defevent TestWatchEvent {:watch (fn [_ _ _] TestUpdateEvent)})
           (:transact store TestWatchEvent)
           (deep= (store :state) @{:test "Test"})))
@@ -47,25 +55,29 @@
   (test "many watch events"
         (do 
           (def store (shawn/init-store))
-          (shawn/defevent TestUpdateEvent {:update (fn [_ state] (put state :test "Test"))})
-          (shawn/defevent TesttUpdateEvent {:update (fn [_ state] (update state :test |(string $ "t")))})
           (shawn/defevent TestWatchEvent {:watch (fn [_ _ _] [TestUpdateEvent TesttUpdateEvent TesttUpdateEvent])})
           (:transact store TestWatchEvent)
           (deep= (store :state) @{:test "Testtt"})))
   (test "one fiber event"
         (do 
           (def store (shawn/init-store))
-          (shawn/defevent TestUpdateEvent {:update (fn [_ state] (put state :test "Test"))})
-          (shawn/defevent TesttUpdateEvent {:update (fn [_ state] (update state :test |(string $ "t")))})
           (shawn/defevent TestFiberEvent 
             {:watch
              (fn [_ _ _]
                (coro 
-                 (shawn/make-event {:watch 
-                                    (fn [_ _ _] 
-                                      [TestUpdateEvent TesttUpdateEvent TesttUpdateEvent TesttUpdateEvent])})))})
+                (yield TestUpdateEvent)
+                (yield TesttUpdateEvent)
+                (yield TesttUpdateEvent)
+                TesttUpdateEvent))})
           (:transact store TestFiberEvent)
           (deep= (store :state) @{:test "Testttt"})))
+  (test "one thread event"
+        (do 
+         (def store (shawn/init-store))
+         (shawn/defevent TestThreadEvent 
+           {:watch (fn watch [_ _ _] (thread/new worker))})
+         (:transact store TestThreadEvent)
+         (deep= (store :state) @{:test "Test"})))
   (test "combined event"
         (pending "combined event")))
 
