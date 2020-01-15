@@ -1,3 +1,5 @@
+(def tick 0.0001)
+
 (defn- watchable-error [watchable]
   (error (string "Watchable must be Event, Array of Events or Fiber. Got: " (type watchable))))
 
@@ -40,7 +42,9 @@
   (update self :pending |(filter (fn [p] (and (fiber? p) (not= :dead (fiber/status p)))) $)))
 
 (defn- process-holding [self]
+  (var i 0)
   (while (not (empty? (self :holding)))
+    (print (++ i))
     (let [[ok res] (protect (thread/receive 0))]
       (if ok
         (cond
@@ -51,9 +55,10 @@
          (let [tid (last res)
                ti (find-index |(= (first $) tid) (self :holding))
                t (get-in self [:holding ti 1])]
-           (thread/close t)
+           (:close t)
            (array/remove (self :holding) ti))
-         (watchable-error res))))))
+         (watchable-error res))))
+         (os/sleep tick)))
 
 (defn- notify [self]
   (unless (deep= (self :old-state) (self :state))
@@ -73,7 +78,8 @@
      (or (fiber? watchable))
      (array/push (self :pending) watchable)
      (= :core/thread (type watchable))
-     (let [tid (string (math/ceil (os/clock)) (math/rng-int (math/rng)))]
+     (let [tid (string (math/ceil (os/clock))
+                       (math/rng-int (math/rng)))]
        (:send watchable tid)
        (array/push (self :holding) [tid watchable]))
      (watchable-error watchable)))
