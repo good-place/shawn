@@ -42,9 +42,7 @@
   (update self :pending |(filter (fn [p] (and (fiber? p) (not= :dead (fiber/status p)))) $)))
 
 (defn- process-holding [self]
-  (var i 0)
   (while (not (empty? (self :holding)))
-    (print (++ i))
     (let [[ok res] (protect (thread/receive 0))]
       (if ok
         (cond
