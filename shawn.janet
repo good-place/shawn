@@ -1,8 +1,8 @@
 (defn- watchable-error [watchable]
   (error (string "Watchable must be Event, Array of Events or Fiber. Got: " (type watchable))))
 
-(def- Event 
-  @{:update (fn [_ state]) 
+(def- Event
+  @{:update (fn [_ state])
     :watch (fn [_ state stream] [])
     :effect (fn [_ state stream])})
 
@@ -12,7 +12,7 @@
        (e :watch)
        (e :effect)))
 
-(defn make-event 
+(defn make-event
   "Creates new event"
   [{:update update-fn :watch watch-fn :effect effect-fn}]
   (def tab @{})
@@ -28,47 +28,61 @@
 (defn- process-stream [self]
   (while (not (empty? (self :stream)))
     (:transact self (array/pop (self :stream)))))
- 
+
 (defn- process-pending [self]
   (loop [p :in (self :pending)]
-    (when-let [res (case (type p) 
-                         :fiber (case (fiber/status p)
-                                  :new (resume p)
-                                  :pending (resume p)
-                                  :alive nil
-                                  :dead nil)
-                         :core/thread (let [[ok v] (protect (thread/receive 0.016))]
-                                        (when ok v)))] 
-      (if (event? res) 
-        (:transact self res)
-        (watchable-error res))))
-  (update self :pending |(filter (fn [p] (or (= :core/thread (type p))
-                                             (and (fiber? p) 
-                                                  (not= :dead (fiber/status p))))) $)))
+    (when-let [res (case (fiber/status p)
+                         :new (resume p)
+                         :pending (resume p)
+                         :alive nil
+                         :dead nil)]
+      (if (event? res) (:transact self res) (watchable-error res))))
+  (update self :pending |(filter (fn [p] (and (fiber? p) (not= :dead (fiber/status p)))) $)))
+
+(defn- process-holding [self]
+  (while (not (empty? (self :holding)))
+    (let [[ok res] (protect (thread/receive 0))]
+      (if ok
+        (cond
+         (event? res)
+         (:transact self res)
+         (and (indexed? res)
+              (= (first res) :fin))
+         (let [tid (last res)
+               ti (find-index |(= (first $) tid) (self :holding))
+               t (get-in self [:holding ti 1])]
+           (thread/close t)
+           (array/remove (self :holding) ti))
+         (watchable-error res))))))
 
 (defn- notify [self]
   (unless (deep= (self :old-state) (self :state))
-    (each o (self :observers) 
+    (each o (self :observers)
       (o (self :old-state) (self :state)))))
 
-(defn- transact [self event] 
+(defn- transact [self event]
   (unless (event? event) (error (string "Only Events are transactable. Got: " event)))
   (put self :old-state (table/clone (self :state)))
   (:update event (self :state))
   (let [watchable (:watch event (self :state) (self :stream))]
     (cond
-      (event? watchable)
-      (update self :stream |(array/push $ watchable))
-      (and (indexed? watchable) (all event? watchable))
-      (update self :stream |(array/concat $ (reverse watchable)))
-      (or (fiber? watchable) (= :core/thread (type watchable)))
-      (update self :pending |(array/push $ watchable))
-      (watchable-error watchable)))
+     (event? watchable)
+     (array/push (self :stream) watchable)
+     (and (indexed? watchable) (all event? watchable))
+     (array/concat (self :stream) (reverse watchable))
+     (or (fiber? watchable))
+     (array/push (self :pending) watchable)
+     (= :core/thread (type watchable))
+     (let [tid (string (math/ceil (os/clock)) (math/rng-int (math/rng)))]
+       (:send watchable tid)
+       (array/push (self :holding) [tid watchable]))
+     (watchable-error watchable)))
   (:effect event (self :state) (self :stream))
   (:notify self)
   (:process-stream self)
-  (:process-pending self))
-           
+  (:process-pending self)
+  (:process-holding self))
+
 
 (defn- observe [self observer]
   (array/push (self :observers) observer))
@@ -79,10 +93,12 @@
     :old-state nil
     :stream @[]
     :pending @[]
+    :holding @[]
     :observers @[]
     :transact transact
     :process-stream process-stream
     :process-pending process-pending
+    :process-holding process-holding
     :notify notify
     :observe observe})
 

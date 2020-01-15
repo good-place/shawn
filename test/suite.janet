@@ -2,7 +2,6 @@
 (import ../shawn :as shawn)
 
 (defn- pending [message]
-  (print "\nPending: " message)
   :pending)
 
 (deftest "events"
@@ -29,9 +28,12 @@
 (shawn/defevent TesttUpdateEvent {:update (fn [_ state] 
                                             (update state :test |(string $ "t")))})
 
+# @TODO thread event template
 (defn worker [m] 
-  (os/sleep 1)
-  (thread/send m TestUpdateEvent))
+  (def tid (thread/receive math/inf))
+  (os/sleep 0.1)
+  (thread/send m TestUpdateEvent)
+  (thread/send m [:fin tid]))
 
 (deftest "transact"
   (test "one update event"
@@ -75,8 +77,8 @@
         (do 
          (def store (shawn/init-store))
          (shawn/defevent TestThreadEvent 
-           {:watch (fn watch [_ _ _] (thread/new worker))})
-         (:transact store TestThreadEvent)
+           {:watch (fn watch [_ _ _] (thread/new worker))}) 
+         (:transact store TestThreadEvent) 
          (deep= (store :state) @{:test "Test"})))
   (test "combined event"
         (pending "combined event")))
