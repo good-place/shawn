@@ -31,18 +31,18 @@
   (while (not (empty? (self :stream)))
     (:transact self (array/pop (self :stream)))))
 
-(defn- process-pending [self]
-  (loop [p :in (self :pending)]
+(defn- process-fibers [self]
+  (loop [p :in (self :fibers)]
     (when-let [res (case (fiber/status p)
                          :new (resume p)
                          :pending (resume p)
                          :alive nil
                          :dead nil)]
       (if (event? res) (:transact self res) (watchable-error res))))
-  (update self :pending |(filter (fn [p] (and (fiber? p) (not= :dead (fiber/status p)))) $)))
+  (update self :fibers |(filter (fn [p] (and (fiber? p) (not= :dead (fiber/status p)))) $)))
 
-(defn- process-holding [self]
-  (while (not (empty? (self :holding)))
+(defn- process-threads [self]
+  (while (not (empty? (self :threads)))
     (let [[ok res] (protect (thread/receive 0))]
       (if ok
         (cond
@@ -51,10 +51,10 @@
          (and (indexed? res)
               (= (first res) :fin))
          (let [tid (last res)
-               ti (find-index |(= (first $) tid) (self :holding))
-               t (get-in self [:holding ti 1])]
+               ti (find-index |(= (first $) tid) (self :threads))
+               t (get-in self [:threads ti 1])]
            (:close t)
-           (array/remove (self :holding) ti))
+           (array/remove (self :threads) ti))
          (watchable-error res))))
          (os/sleep tick)))
 
@@ -74,18 +74,18 @@
      (and (indexed? watchable) (all event? watchable))
      (array/concat (self :stream) (reverse watchable))
      (or (fiber? watchable))
-     (array/push (self :pending) watchable)
+     (array/push (self :fibers) watchable)
      (= :core/thread (type watchable))
      (let [tid (string (math/ceil (os/clock))
                        (math/rng-int (math/rng)))]
        (:send watchable tid)
-       (array/push (self :holding) [tid watchable]))
+       (array/push (self :threads) [tid watchable]))
      (watchable-error watchable)))
   (:effect event (self :state) (self :stream))
   (:notify self)
   (:process-stream self)
-  (:process-pending self)
-  (:process-holding self))
+  (:process-fibers self)
+  (:process-threads self))
 
 
 (defn- observe [self observer]
@@ -96,13 +96,13 @@
   @{:state state
     :old-state nil
     :stream @[]
-    :pending @[]
-    :holding @[]
+    :fibers @[]
+    :threads @[]
     :observers @[]
     :transact transact
     :process-stream process-stream
-    :process-pending process-pending
-    :process-holding process-holding
+    :process-fibers process-fibers
+    :process-threads process-threads
     :notify notify
     :observe observe})
 
