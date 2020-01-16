@@ -36,6 +36,8 @@
   (os/sleep 0.1)
   (:send m TestUpdateEvent)
   (os/sleep 0.1)
+  (:send m TesttUpdateEvent)
+  (os/sleep 0.1)
   (:send m (shawn/make-event {:update (fn [_ state] (put state :fest "Fest"))}))
   (os/sleep 0.1)
   (:send m [:fin tid]))
@@ -84,7 +86,7 @@
          (shawn/defevent TestThreadEvent
            {:watch (fn watch [_ _ _] (thread/new worker))})
          (:transact store TestThreadEvent)
-         (deep= (store :state) @{:test "Test" :fest "Fest"})))
+         (deep= (store :state) @{:test "Testt" :fest "Fest"})))
   (test "combined event"
         (pending "combined event")))
 

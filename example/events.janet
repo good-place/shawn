@@ -38,12 +38,20 @@
    :effect (fn [_ _ _] (print "Hard computing"))})
 
 (defn add-many-randoms [amount]
+  (s/make-event {:watch (fn [_ _ _] (seq [_ :range [0 amount]] AddRandom))}))
+
+(defn add-many-thread-randoms [amount]
   (s/make-event {:watch (fn [_ _ _] (seq [_ :range [0 amount]] AddThreadRandom))}))
 
 (s/defevent PrintState
   {:effect (fn [_ state _] (prin "State: ") (pp state))})
 
 (def- help-str
+)
+
+(s/defevent PrintHelp
+  {:effect (fn [_ _ _]
+             (print
 ```
 
 Help:
@@ -51,14 +59,13 @@ Help:
 + [num] add 1 or num to amount
 - [num] substract 1 or num from amount
 r [num] compute and add 1 or num random numbers to amount
+t [num] compute and add 1 or num random numbers to amount in threads
 p print state
 h print this help
 q quit console
 
-```)
-
-(s/defevent PrintHelp
-  {:effect (fn [_ _ _] (print help-str))})
+```
+            ))})
 
 (defn unknown-command [command]
   (s/make-event {:watch (fn [_ _ _ ] PrintHelp)

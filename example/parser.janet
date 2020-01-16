@@ -1,4 +1,4 @@
-(def- grammar 
+(def- grammar
   ~{:spc " "
     :num (cmt (<- (some (range "09")) :num) ,scan-number)
     :inc (* "+" -1 (constant :inc) (constant 1))
@@ -8,6 +8,7 @@
     :zero (* "0" -1 (constant :zero))
     :rnd (* "r" -1 (constant :rnd) (constant 1))
     :prnd (* "r" :spc (constant :rnd) :num)
+    :trnd (* "t" :spc (constant :trnd) :num)
     :print (* "p" -1 (constant :print))
     :help (* "h" -1 (constant :help))
     :exit (* "q" -1 (constant :exit))
@@ -15,9 +16,10 @@
              :dec
              :pinc
              :pdec
-             :zero 
-             :rnd 
+             :zero
+             :rnd
              :prnd
+             :trnd
              :print
              :help
              :exit)})
