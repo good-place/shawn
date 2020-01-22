@@ -30,11 +30,12 @@
    :effect (fn [_ _ _] (print "Hard computing"))})
 
 (s/defevent AddRandom
-  {:watch (fn [_ _ _]
-            (coro
-              (var res 0)
-              (loop [_ :range [0 (* (math/random) 10_000_000)]] (+= res (math/random)))
-              (increase-amount res)))
+  {:watch
+   (fn [_ _ _]
+     (coro
+       (var res 0)
+       (loop [_ :range [0 (* (math/random) 10_000_000)]] (+= res (math/random)))
+       (increase-amount res)))
    :effect (fn [_ _ _] (print "Hard computing"))})
 
 (defn add-many-randoms [amount]
