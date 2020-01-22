@@ -87,7 +87,6 @@
   (:process-fibers self)
   (:process-threads self))
 
-
 (defn- observe [self observer]
   (array/push (self :observers) observer))
 

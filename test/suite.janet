@@ -88,7 +88,9 @@
          (:transact store TestThreadEvent)
          (deep= (store :state) @{:test "Testt" :fest "Fest"})))
   (test "combined event"
-        (pending "combined event")))
+        (pending "combined event"))
+  (test "error event"
+        (pending "error event")))
 
 (deftest "observers"
   (test "observe"
