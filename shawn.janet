@@ -1,5 +1,3 @@
-(def tick 0.0001)
-
 (defn- watchable-error [watchable]
   (error (string "Watchable must be Event, Array of Events or Fiber. Got: " (type watchable))))
 
@@ -27,6 +25,8 @@
   [name fns]
   ~(def ,name (,make-event ,fns)))
 
+(defevent Empty {})
+
 (defn- process-stream [self]
   (while (not (empty? (self :stream)))
     (:transact self (array/pop (self :stream)))))
@@ -42,8 +42,8 @@
   (update self :fibers |(filter (fn [p] (and (fiber? p) (not= :dead (fiber/status p)))) $)))
 
 (defn- process-threads [self]
-  (while (not (empty? (self :threads)))
-    (let [[ok res] (protect (thread/receive 0))]
+  (when (not (empty? (self :threads)))
+    (let [[ok res] (protect (thread/receive (self :tick)))]
       (if ok
         (cond
          (event? res)
@@ -54,9 +54,10 @@
                ti (find-index |(= (first $) tid) (self :threads))
                t (get-in self [:threads ti 1])]
            (:close t)
-           (array/remove (self :threads) ti))
-         (watchable-error res))))
-         (os/sleep tick)))
+           (array/remove (self :threads) ti)
+           (:transact self Empty))
+         (watchable-error res))
+        (:transact self Empty))) ))
 
 (defn- notify [self]
   (unless (deep= (self :old-state) (self :state))
@@ -90,18 +91,22 @@
 (defn- observe [self observer]
   (array/push (self :observers) observer))
 
-(defn init-store [&opt state]
-  (default state @{})
-  @{:state state
+(def Store
+  @{:transact transact
+    :tick (/ 60)
     :old-state nil
     :stream @[]
     :fibers @[]
     :threads @[]
     :observers @[]
-    :transact transact
     :process-stream process-stream
     :process-fibers process-fibers
     :process-threads process-threads
     :notify notify
     :observe observe})
+
+(defn init-store [&opt state store]
+  (default state @{})
+  (default store @{:state state})
+  (table/setproto store Store))
 
