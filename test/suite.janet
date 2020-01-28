@@ -31,17 +31,14 @@
 (shawn/defevent TesttUpdateEvent
   {:update (fn [_ state] (update state :test |(string $ "t")))})
 
-# @TODO thread event worker macro
+(def hard-work (os/sleep 0.001))
+# Could be used as worker template
 (defn worker [m]
   (def tid (thread/receive math/inf))
-  (os/sleep 0.1)
-  (:send m TestUpdateEvent)
-  (os/sleep 0.1)
-  (:send m TesttUpdateEvent)
-  (os/sleep 0.1)
-  (:send m (shawn/make-event {:update (fn [_ state] (put state :fest "Fest"))}))
-  (os/sleep 0.1)
-  (:send m [:fin tid]))
+  (defer (:send m [:fin tid])
+    hard-work
+    (:send m TesttUpdateEvent)
+    hard-work))
 
 (deftest "transact"
   (test "one update event"
@@ -84,10 +81,12 @@
   (test "one thread event"
         (do
          (def store (shawn/init-store))
-         (shawn/defevent TestThreadEvent
-           {:watch (fn [_ _ _] (thread/new worker))})
-         (:transact store TestThreadEvent)
-         (deep= (store :state) @{:test "Testt" :fest "Fest"})))
+         (shawn/defevent TestThreadEvent {:watch (fn [_ _ _] (thread/new worker))})
+         (:transact store TestUpdateEvent)
+         (loop [_ :in (range 10)] (:transact store TestThreadEvent))
+         (:transact store (shawn/make-event {:update (fn [_ state] (put state :fest "Fest"))}))
+         (pp (store :state))
+         (deep= (store :state) @{:test "Testtttttttttt" :fest "Fest"})))
   (test "combined event"
         (pending "combined event"))
   (test "error event"

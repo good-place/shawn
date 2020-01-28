@@ -1,16 +1,14 @@
-(defn- watchable-error [watchable]
-  (error (string "Watchable must be Event, Array of Events or Fiber. Got: " (type watchable))))
-
 (def- Event
   @{:update (fn [_ state])
     :watch (fn [_ state stream] [])
     :effect (fn [_ state stream])})
 
-(defn event? [e]
-  (and (dictionary? e)
-       (e :update)
-       (e :watch)
-       (e :effect)))
+(defn event? [event]
+  "Returns true if event is Event "
+  (and (table? event)
+       (event :update)
+       (event :watch)
+       (event :effect)))
 
 (defn make-event
   "Creates new event"
@@ -25,31 +23,24 @@
   [name fns]
   ~(def ,name (,make-event ,fns)))
 
-(defevent Empty {})
-
 (defn- process-stream [self]
   (def stream (self :stream))
+  (defn return [what] (array/push stream what))
   (while (not (empty? stream))
-    (let [w (array/pop stream)]
-      (match w
-               (event (event? event)) (:transact self w)
-               (fiber (fiber? fiber) (= :dead (fiber/status fiber))) nil
-               (fiber (fiber? fiber) (= :alive (fiber/status fiber))) (array/push stream fiber)
-               (fiber (fiber? fiber))
-                 (do (array/push stream fiber)
-                     (:transact self (resume fiber)))))))
-
-(defn- process-threads [self]
-  (when (not (empty? (self :threads)))
-    (match (protect (thread/receive (self :tick)))
-           [false _] (:transact self Empty)
-           [true (event (event? event))] (:transact self event)
-           [true [(msg (= msg :fin)) tid]]
-           (let [ti (find-index |(= (first $) tid) (self :threads))
-                 t (get-in self [:threads ti 1])]
-             (:close t)
-             (array/remove (self :threads) ti)
-             (:transact self Empty)))))
+    (type (last stream))
+    (match (array/pop stream)
+      (event (event? event)) (:transact self event)
+      (fiber (fiber? fiber) (= (fiber/status fiber) :alive)) (return fiber)
+      (fiber (fiber? fiber) (some |(= (fiber/status fiber) $) [:pending :new]))
+      (do (return fiber) (:transact self (resume fiber)))
+      [id (thread (= (type thread) :core/thread))]
+      (match (protect (thread/receive (self :tick)))
+        [false _] (do (return [id thread]))
+        [true [(msg (= msg :fin)) tid]]
+        (if (= id tid) (:close thread)
+          (let [t (find |(= (first $) tid) (return [id thread]))]
+            (:close t)))
+        [true event] (do (return [id thread]) (:transact self event))))))
 
 (defn- notify [self]
   (unless (deep= (self :old-state) (self :state))
@@ -60,24 +51,19 @@
   (assert (event? event) (string "Only Events are transactable. Got: " event))
   (put self :old-state (table/clone (self :state)))
   (:update event (self :state))
-  (let [watchable (:watch event (self :state) (self :stream))]
-    (cond
-     (event? watchable)
-     (array/push (self :stream) watchable)
-     (and (indexed? watchable) (all event? watchable))
-     (array/concat (self :stream) (reverse watchable))
-     (or (fiber? watchable))
-     (array/push (self :stream) watchable)
-     (= :core/thread (type watchable))
-     (let [tid (string watchable)]
-       (:send watchable tid)
-       (array/push (self :threads) [tid watchable]))
-     (watchable-error watchable)))
+  (match (:watch event (self :state) (self :stream))
+    (arr (indexed? arr) (all event? arr))
+    (array/concat (self :stream) (reverse arr))
+    (eorf (or (event? eorf) (fiber? eorf)))
+    (array/push (self :stream) eorf)
+    (thread (= (type thread) :core/thread))
+    (let [tid (string thread)]
+      (:send thread tid)
+      (array/push (self :stream) [tid thread]))
+    bad (error (string "Watchable must be Event, Array of Events, Fiber or Thread. Got: " (type bad))))
   (:effect event (self :state) (self :stream))
   (:notify self)
-  (:process-stream self)
-  (:process-threads self)
-  nil)
+  (:process-stream self))
 
 (defn- observe [self observer]
   (array/push (self :observers) observer))
@@ -91,7 +77,6 @@
     :threads @[]
     :observers @[]
     :process-stream process-stream
-    :process-threads process-threads
     :notify notify
     :observe observe})
 
