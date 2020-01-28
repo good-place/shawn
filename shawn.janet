@@ -28,18 +28,16 @@
 (defevent Empty {})
 
 (defn- process-stream [self]
-  (while (not (empty? (self :stream)))
-    (:transact self (array/pop (self :stream)))))
-
-(defn- process-fibers [self]
-  (loop [p :in (self :fibers)]
-    (when-let [res (case (fiber/status p)
-                         :new (resume p)
-                         :pending (resume p)
-                         :alive nil
-                         :dead nil)]
-      (if (event? res) (:transact self res) (watchable-error res))))
-  (update self :fibers |(filter (fn [p] (and (fiber? p) (not= :dead (fiber/status p)))) $)))
+  (def stream (self :stream))
+  (while (not (empty? stream))
+    (let [w (array/pop stream)]
+      (match w
+               (event (event? event)) (:transact self w)
+               (fiber (fiber? fiber) (= :dead (fiber/status fiber))) nil
+               (fiber (fiber? fiber) (= :alive (fiber/status fiber))) (array/push stream fiber)
+               (fiber (fiber? fiber))
+                 (do (array/push stream fiber)
+                     (:transact self (resume fiber)))))))
 
 (defn- process-threads [self]
   (when (not (empty? (self :threads)))
@@ -59,7 +57,7 @@
       (o (self :old-state) (self :state)))))
 
 (defn- transact [self event]
-  (unless (event? event) (error (string "Only Events are transactable. Got: " event)))
+  (assert (event? event) (string "Only Events are transactable. Got: " event))
   (put self :old-state (table/clone (self :state)))
   (:update event (self :state))
   (let [watchable (:watch event (self :state) (self :stream))]
@@ -69,7 +67,7 @@
      (and (indexed? watchable) (all event? watchable))
      (array/concat (self :stream) (reverse watchable))
      (or (fiber? watchable))
-     (array/push (self :fibers) watchable)
+     (array/push (self :stream) watchable)
      (= :core/thread (type watchable))
      (let [tid (string watchable)]
        (:send watchable tid)
@@ -78,8 +76,8 @@
   (:effect event (self :state) (self :stream))
   (:notify self)
   (:process-stream self)
-  (:process-fibers self)
-  (:process-threads self))
+  (:process-threads self)
+  nil)
 
 (defn- observe [self observer]
   (array/push (self :observers) observer))
@@ -93,7 +91,6 @@
     :threads @[]
     :observers @[]
     :process-stream process-stream
-    :process-fibers process-fibers
     :process-threads process-threads
     :notify notify
     :observe observe})
