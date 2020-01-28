@@ -25,10 +25,11 @@
           (shawn/event? TestEvent))))
 
 
-(shawn/defevent TestUpdateEvent {:update (fn [_ state] (put state :test "Test"))})
+(shawn/defevent TestUpdateEvent
+  {:update (fn [_ state] (put state :test "Test"))})
 
-(shawn/defevent TesttUpdateEvent {:update (fn [_ state]
-                                            (update state :test |(string $ "t")))})
+(shawn/defevent TesttUpdateEvent
+  {:update (fn [_ state] (update state :test |(string $ "t")))})
 
 # @TODO thread event worker macro
 (defn worker [m]
@@ -84,7 +85,7 @@
         (do
          (def store (shawn/init-store))
          (shawn/defevent TestThreadEvent
-           {:watch (fn watch [_ _ _] (thread/new worker))})
+           {:watch (fn [_ _ _] (thread/new worker))})
          (:transact store TestThreadEvent)
          (deep= (store :state) @{:test "Testt" :fest "Fest"})))
   (test "combined event"
