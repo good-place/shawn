@@ -22,7 +22,7 @@
 (defn worker [m]
   (def tid (thread/receive math/inf))
   (var res 0)
-  (loop [_ :range [0 (* (math/random) 100_000_000)]] (+= res (math/random)))
+  (loop [_ :range [0 (* (math/random) 10_000_000)]] (+= res (math/random)))
   (:send m (increase-amount res))
   (:send m [:fin tid]))
 
@@ -35,7 +35,7 @@
    (fn [_ _ _]
      (coro
        (var res 0)
-       (loop [_ :range [0 (* (math/random) 10_000_000)]] (+= res (math/random)))
+       (loop [_ :range [0 (* (math/random) 1_000_000)]] (+= res (math/random)))
        (increase-amount res)))
    :effect (fn [_ _ _] (print "Hard computing"))})
 

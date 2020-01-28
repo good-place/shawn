@@ -1,29 +1,32 @@
 (import shawn/event :as event)
 
-(defn- _process-stream [self]
-  (def stream (self :_stream))
+(defn- _process-stream [store]
+  (def stream (store :_stream))
   (defn return [what] (array/insert stream 0 what))
   (while (not (empty? stream))
     (match (array/pop stream)
-      (event (event/valid? event)) (:transact self event)
+      (e (event/valid? e)) (:transact store e)
       (fiber (fiber? fiber) (= (fiber/status fiber) :alive)) (return fiber)
-      (fiber (fiber? fiber) (some |(= (fiber/status fiber) $) [:pending :new]))
-      (do (return fiber) (:transact self (resume fiber)))
+      (fiber (fiber? fiber) (or (= (fiber/status fiber) :pending)
+                                (= (fiber/status fiber) :new)))
+      (do (return fiber) (:transact store (resume fiber)))
       [id (thread (= (type thread) :core/thread))]
-      (match (protect (thread/receive (self :tick)))
-        [false _] (do (return [id thread]))
+      (match (protect (thread/receive (store :tick)))
         [true [(msg (= msg :fin)) tid]]
         (if (= id tid)
           (:close thread)
-          (let [t ((find |(= (first $) tid) (return [id thread])))]
-            (:close t)))
-        [true event] (do (return [id thread]) (:transact self event))))))
+          (let [ti (find-index |(= (first $) tid) (return [id thread]))
+                t (get-in stream [ti 1])]
+            (:close t)
+            (array/remove stream ti)))
+        [true event] (do (return [id thread]) (:transact store event))
+        [false _] (return [id thread])))))
 
-(defn- _notify [self]
-  (defer (put self :_old-state nil)
-    (unless (deep= (self :_old-state) (self :state))
-      (each o (self :_observers)
-        (o (self :_old-state) (self :state))))))
+(defn- _notify [store]
+  (defer (put store :_old-state nil)
+    (unless (deep= (store :_old-state) (store :state))
+      (each o (store :_observers)
+        (o (store :_old-state) (store :state))))))
 
 (defn transact
   "Transacts Event into Store. Has two parameters:\n
@@ -32,20 +35,21 @@
    This functions is called when you call :transact method on Store"
   [store event]
   (assert (event/valid? event) (string "Only Events are transactable. Got: " event))
-  (put store :_old-state (table/clone (store :state)))
-  (:update event (store :state))
+  (def {:state state :_stream stream} store)
+  (put store :_old-state (table/clone state))
+  (:update event state)
   (:_notify store)
-  (match (:watch event (store :state) (store :_stream))
+  (match (:watch event state stream)
     (arr (indexed? arr) (all event/valid? arr))
-    (array/concat (store :_stream) (reverse arr))
+    (array/concat stream (reverse arr))
     (eorf (or (event/valid? eorf) (fiber? eorf)))
-    (array/push (store :_stream) eorf)
+    (array/push stream eorf)
     (thread (= (type thread) :core/thread))
     (let [tid (string thread)]
       (:send thread tid)
-      (array/push (store :_stream) [tid thread]))
+      (array/push stream [tid thread]))
     bad (error (string "Only Event, Array of Events, Fiber and Thread are watchable. Got:" (type bad))))
-  (:effect event (store :state) (store :_stream))
+  (:effect event state stream)
   (:_process-stream store))
 
 (defn observe

@@ -4,8 +4,8 @@
 
 (def store (shawn/init-store))
 
-(:observe store (fn [os ns] (when (< 1 (ns :amount)) (print "Oh yes big amount"))))
-(:observe store (fn [os ns] (when (> 0 (ns :amount)) (print "Oh no negative amount"))))
+(:observe store (fn [_ ns] (when (< 1 (ns :amount)) (print "Oh yes big amount"))))
+(:observe store (fn [_ ns] (when (> 0 (ns :amount)) (print "Oh no negative amount"))))
 (:observe store (fn [os ns]
                   (when (and (os :amount) (ns :amount))
                     (when (< (os :amount) (ns :amount)) (print "Oh yes amount went up"))
