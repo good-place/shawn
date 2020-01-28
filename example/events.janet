@@ -47,9 +47,6 @@
 (s/defevent PrintState
   {:effect (fn [_ state _] (prin "State: ") (pp state))})
 
-(def- help-str
-)
-
 (s/defevent PrintHelp
   {:effect (fn [_ _ _]
              (print
