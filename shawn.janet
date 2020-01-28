@@ -1,7 +1,7 @@
 (import shawn/event :as event)
 
-(defn- process-stream [self]
-  (def stream (self :stream))
+(defn- _process-stream [self]
+  (def stream (self :_stream))
   (defn return [what] (array/push stream what))
   (while (not (empty? stream))
     (type (last stream))
@@ -19,46 +19,68 @@
             (:close t)))
         [true event] (do (return [id thread]) (:transact self event))))))
 
-(defn- notify [self]
-  (unless (deep= (self :old-state) (self :state))
-    (each o (self :observers)
-      (o (self :old-state) (self :state)))))
+(defn- _notify [self]
+  (defer (put self :_old-state nil)
+    (unless (deep= (self :_old-state) (self :state))
+      (each o (self :_observers)
+        (o (self :_old-state) (self :state))))))
 
-(defn- transact [self event]
+(defn transact
+  "Transacts Event into Store. Has two parameters:\n
+   store: Store to which we are transacting\n
+   event: Event we are transacting. Throws when the Event is invalid\n
+   This functions is called when you call :transact method on Store"
+  [store event]
   (assert (event/valid? event) (string "Only Events are transactable. Got: " event))
-  (put self :old-state (table/clone (self :state)))
-  (:update event (self :state))
-  (:notify self)
-  (match (:watch event (self :state) (self :stream))
+  (put store :_old-state (table/clone (store :state)))
+  (:update event (store :state))
+  (:_notify store)
+  (match (:watch event (store :state) (store :_stream))
     (arr (indexed? arr) (all event/valid? arr))
-    (array/concat (self :stream) (reverse arr))
+    (array/concat (store :_stream) (reverse arr))
     (eorf (or (event/valid? eorf) (fiber? eorf)))
-    (array/push (self :stream) eorf)
+    (array/push (store :_stream) eorf)
     (thread (= (type thread) :core/thread))
     (let [tid (string thread)]
       (:send thread tid)
-      (array/push (self :stream) [tid thread]))
+      (array/push (store :_stream) [tid thread]))
     bad (error (string "Only Event, Array of Events, Fiber and Thread are watchable. Got:" (type bad))))
-  (:effect event (self :state) (self :stream))
-  (:process-stream self))
+  (:effect event (store :state) (store :_stream))
+  (:_process-stream store))
 
-(defn- observe [self observer]
-  (array/push (self :observers) observer))
+(defn observe
+  "Adds observer function to store. Has two parameters:\n
+   store: Store to which observer is added
+   observer: observer function\n
+   Observed functions are called everytime state
+   changes with two parameters:\n
+   old-state: state before the change\n
+   new-state: state after the change\n
+   This function is called when you call :observe method on Store"
+  [store observer]
+  (array/push (store :_observers) observer))
 
 (def Store
-  @{:transact transact
-    :tick (/ 60)
-    :old-state nil
-    :stream @[]
-    :fibers @[]
-    :threads @[]
-    :observers @[]
-    :process-stream process-stream
-    :notify notify
-    :observe observe})
+  "Store prototype. It has two public methods:\n
+  (:transact store event): transacts given Event\n
+  (:observe store obserer): adds observer to the Store"
+  @{:tick (/ 60)
+    :transact transact
+    :observe observe
+    :_old-state nil
+    :_stream @[]
+    :_observers @[]
+    :_process-stream _process-stream
+    :_notify _notify})
 
-(defn init-store [&opt state store]
+(defn init-store
+  "Factory function for creating new Store with two optional parameters:\n
+   state: initial state for the Store. Default @{}. Throws when state is not table\n
+   opts: pairs with options for the Store, they are merged after setting Store prototype.
+   Throws when opts do not have even count."
+  [&opt state & opts]
   (default state @{})
-  (default store @{:state state})
-  (table/setproto store Store))
+  (assert (table? state) "State must be tuple")
+  (assert (even? (length opts)) "Options must be even count pairs of key and value")
+  (-> @{:state state} (table/setproto Store) (merge-into (table ;opts))))
 
