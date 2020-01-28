@@ -1,103 +1,101 @@
 (use tester)
 (import ../shawn :as shawn)
-
-(defn- pending [message]
-  (print)
-  (print "Pending: " message)
-  :pending)
+(import ../shawn/event :as event)
 
 (deftest "events"
   (test "make-event"
         (do
-          (def event (shawn/make-event {:update (fn [_ state] state)}))
-          (and (event :update)
-               (event :watch)
-               (event :effect))))
+          (def e (event/make {:update (fn [_ state] state)}))
+          (and (e :update)
+               (e :watch)
+               (e :effect))))
   (test "defevent"
         (do
-          (shawn/defevent TestEvent {:update (fn [_ state] state)})
+          (event/defevent TestEvent {:update (fn [_ state] state)})
           (and (TestEvent :update)
                (TestEvent :watch)
                (TestEvent :effect))))
-  (test "event?"
+  (test "valid?"
         (do
-          (shawn/defevent TestEvent {:update (fn [_ state] state)})
-          (shawn/event? TestEvent))))
+          (event/defevent TestEvent {:update (fn [_ state] state)})
+          (event/valid? TestEvent))))
 
 
-(shawn/defevent TestUpdateEvent
+(event/defevent TestUpdateEvent
   {:update (fn [_ state] (put state :test "Test"))})
 
-(shawn/defevent TesttUpdateEvent
+(event/defevent TesttUpdateEvent
   {:update (fn [_ state] (update state :test |(string $ "t")))})
 
 (def hard-work (os/sleep 0.001))
 # Could be used as worker template
 (defn worker [m]
-  (def tid (thread/receive math/inf))
-  (defer (:send m [:fin tid])
-    hard-work
-    (:send m TesttUpdateEvent)
-    hard-work))
+  (with [_ [:fin (thread/receive math/inf)] |(:send m $)]
+     hard-work
+     (:send m TesttUpdateEvent)
+     hard-work))
 
 (deftest "transact"
   (test "one update event"
-        (do
-          (def store (shawn/init-store))
+        (let [store (shawn/init-store)]
           (:transact store TestUpdateEvent)
           (deep= (store :state) @{:test "Test"})))
   (test "one watch event"
-        (do
-          (def store (shawn/init-store))
-          (shawn/defevent TestWatchEvent {:watch (fn [_ _ _] TestUpdateEvent)})
+        (let [store (shawn/init-store)]
+          (event/defevent TestWatchEvent {:watch (fn [_ _ _] TestUpdateEvent)})
           (:transact store TestWatchEvent)
           (deep= (store :state) @{:test "Test"})))
   (test "one effect event"
-        (do
-          (def store (shawn/init-store))
-          (shawn/defevent TestEffectEvent {:effect (fn [_ state _] (error "Effect triggered"))})
-          (try
-            (:transact store TestEffectEvent)
-            ([message] (= message "Effect triggered")))))
+        (let [store (shawn/init-store)]
+          (var ok false)
+          (event/defevent TestEffectEvent {:effect (fn [_ state _] (set ok true))})
+          (:transact store TestEffectEvent)
+          ok))
   (test "many watch events"
-        (do
-          (def store (shawn/init-store))
-          (shawn/defevent TestWatchEvent {:watch (fn [_ _ _] [TestUpdateEvent TesttUpdateEvent TesttUpdateEvent])})
-          (:transact store TestWatchEvent)
-          (deep= (store :state) @{:test "Testtt"})))
+       (let [store (shawn/init-store)]
+         (event/defevent TestWatchEvent {:watch (fn [_ _ _] [TestUpdateEvent TesttUpdateEvent TesttUpdateEvent])})
+         (:transact store TestWatchEvent)
+         (deep= (store :state) @{:test "Testtt"})))
   (test "one fiber event"
-        (do
-          (def store (shawn/init-store))
-          (shawn/defevent TestFiberEvent
+        (let [store (shawn/init-store)]
+          (event/defevent TestFiberEvent
             {:watch
              (fn [_ _ _]
                (coro
                 (yield TestUpdateEvent)
-                (yield TesttUpdateEvent)
-                (yield TesttUpdateEvent)
+                (for _ 0 5 (yield TesttUpdateEvent))
                 TesttUpdateEvent))})
           (:transact store TestFiberEvent)
-          (deep= (store :state) @{:test "Testttt"})))
+          (deep= (store :state) @{:test "Testtttttt"})))
   (test "one thread event"
-        (do
-         (def store (shawn/init-store))
-         (shawn/defevent TestThreadEvent {:watch (fn [_ _ _] (thread/new worker))})
-         (:transact store TestUpdateEvent)
-         (loop [_ :in (range 10)] (:transact store TestThreadEvent))
-         (:transact store (shawn/make-event {:update (fn [_ state] (put state :fest "Fest"))}))
-         (pp (store :state))
-         (deep= (store :state) @{:test "Testtttttttttt" :fest "Fest"})))
+        (let [store (shawn/init-store)]
+          (event/defevent TestThreadEvent {:watch (fn [_ _ _] (thread/new worker))})
+          (:transact store TestUpdateEvent)
+          (for _ 0 5 (:transact store TestThreadEvent))
+          (:transact store (event/make {:update (fn [_ state] (put state :fest "Fest"))}))
+          (deep= (store :state) @{:test "Testttttt" :fest "Fest"})))
   (test "combined event"
-        (pending "combined event"))
+        (let [store (shawn/init-store)]
+          (var ok false)
+          (event/defevent CombinedEvent {:update (fn [_ state] (put state :test "Test"))
+                                         :watch (fn [_ _ _] TesttUpdateEvent)
+                                         :effect (fn [_ state _] (set ok true))})
+          (:transact store CombinedEvent)
+          (and ok (deep= (store :state) @{:test "Testt"}))))
   (test "error event"
-        (pending "error event")))
+        (let [store (shawn/init-store)]
+          (match (protect (:transact store {}))
+                 [false err] (string/has-prefix? "Only Events are transactable. Got: " err))))
+  (test "watch error event"
+        (let [store (shawn/init-store)]
+          (match (protect (:transact store (event/make {:watch (fn [_ _ _] {})})))
+                 [false err] (string/has-prefix? "Only Event, Array of Events, Fiber and Thread are watchable. Got:" err)))))
 
 (deftest "observers"
   (test "observe"
-        (do
-          (def store (shawn/init-store))
-          (:observe store (fn [old-state new-state] (when (= (new-state :test) "Test") (error "State should contain test"))))
-          (shawn/defevent TestUpdateEvent {:update (fn [_ state] (put state :test "Test"))})
-          (try
-            (:transact store TestUpdateEvent)
-            ([message] (= message "State should contain test"))))))
+        (let [store (shawn/init-store)]
+          (var ok false)
+          (:observe store (fn [_ new-state] (set ok (= (new-state :test) "Test"))))
+          (event/defevent TestUpdateEvent {:update (fn [_ state] (put state :test "Test"))})
+          (:transact store TestUpdateEvent)
+          ok)))
