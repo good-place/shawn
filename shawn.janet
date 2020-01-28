@@ -2,9 +2,8 @@
 
 (defn- _process-stream [self]
   (def stream (self :_stream))
-  (defn return [what] (array/push stream what))
+  (defn return [what] (array/insert stream 0 what))
   (while (not (empty? stream))
-    (type (last stream))
     (match (array/pop stream)
       (event (event/valid? event)) (:transact self event)
       (fiber (fiber? fiber) (= (fiber/status fiber) :alive)) (return fiber)
@@ -14,8 +13,9 @@
       (match (protect (thread/receive (self :tick)))
         [false _] (do (return [id thread]))
         [true [(msg (= msg :fin)) tid]]
-        (if (= id tid) (:close thread)
-          (let [t (find |(= (first $) tid) (return [id thread]))]
+        (if (= id tid)
+          (:close thread)
+          (let [t ((find |(= (first $) tid) (return [id thread])))]
             (:close t)))
         [true event] (do (return [id thread]) (:transact self event))))))
 
