@@ -43,21 +43,15 @@
 
 (defn- process-threads [self]
   (when (not (empty? (self :threads)))
-    (let [[ok res] (protect (thread/receive (self :tick)))]
-      (if ok
-        (cond
-         (event? res)
-         (:transact self res)
-         (and (indexed? res)
-              (= (first res) :fin))
-         (let [tid (last res)
-               ti (find-index |(= (first $) tid) (self :threads))
-               t (get-in self [:threads ti 1])]
-           (:close t)
-           (array/remove (self :threads) ti)
-           (:transact self Empty))
-         (watchable-error res))
-        (:transact self Empty))) ))
+    (match (protect (thread/receive (self :tick)))
+           [false _] (:transact self Empty)
+           [true (event (event? event))] (:transact self event)
+           [true [(msg (= msg :fin)) tid]]
+           (let [ti (find-index |(= (first $) tid) (self :threads))
+                 t (get-in self [:threads ti 1])]
+             (:close t)
+             (array/remove (self :threads) ti)
+             (:transact self Empty)))))
 
 (defn- notify [self]
   (unless (deep= (self :old-state) (self :state))
@@ -77,8 +71,7 @@
      (or (fiber? watchable))
      (array/push (self :fibers) watchable)
      (= :core/thread (type watchable))
-     (let [tid (string (math/ceil (os/clock))
-                       (math/rng-int (math/rng)))]
+     (let [tid (string watchable)]
        (:send watchable tid)
        (array/push (self :threads) [tid watchable]))
      (watchable-error watchable)))
