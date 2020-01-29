@@ -14,42 +14,46 @@
   (event/make {:update (fn [_ state] (update state :amount |(- $ amount)))}))
 
 (event/defevent ZeroAmountAndIncrease
-  {:watch (fn [_ _ _] [ZeroAmount (increase-amount 1)])})
+  {:watch (fn [&] [ZeroAmount (increase-amount 1)])})
 
 (event/defevent PrepareState
-  {:watch (fn [_ _ _] [ZeroAmountAndIncrease ZeroQuality])})
+  {:watch (fn [&] [ZeroAmountAndIncrease ZeroQuality])})
+
+(event/defevent MillionDown {:effect (fn [&] (print ">>>>> Million down"))})
 
 (defn worker [m]
   (def tid (thread/receive math/inf))
   (var res 0)
-  (loop [_ :range [0 (* (math/random) 10_000_000)]] (+= res (math/random)))
+  (for _ 0 10
+    (loop [_ :range [0 (* (math/random) 1_000_000)]] (+= res (math/random)))
+    (:send m MillionDown))
   (:send m (increase-amount res))
   (:send m [:fin tid]))
 
 (event/defevent AddThreadRandom
-  {:watch (fn [_ _ _] (thread/new worker))
-   :effect (fn [_ _ _] (print "Hard computing"))})
+  {:watch (fn [&] (thread/new worker))
+   :effect (fn [&] (print "Hardest computing"))})
 
 (event/defevent AddRandom
   {:watch
-   (fn [_ _ _]
+   (fn [&]
      (coro
        (var res 0)
        (loop [_ :range [0 (* (math/random) 1_000_000)]] (+= res (math/random)))
        (increase-amount res)))
-   :effect (fn [_ _ _] (print "Hard computing"))})
+   :effect (fn [&] (print "Hard computing"))})
 
 (defn add-many-randoms [amount]
-  (event/make {:watch (fn [_ _ _] (seq [_ :range [0 amount]] AddRandom))}))
+  (event/make {:watch (fn [&] (seq [_ :range [0 amount]] AddRandom))}))
 
 (defn add-many-thread-randoms [amount]
-  (event/make {:watch (fn [_ _ _] (seq [_ :range [0 amount]] AddThreadRandom))}))
+  (event/make {:watch (fn [&] (seq [_ :range [0 amount]] AddThreadRandom))}))
 
 (event/defevent PrintState
   {:effect (fn [_ state _] (prin "State: ") (pp state))})
 
 (event/defevent PrintHelp
-  {:effect (fn [_ _ _]
+  {:effect (fn [&]
              (print
 ```
 
@@ -67,7 +71,7 @@ q quit console
             ))})
 
 (defn unknown-command [command]
-  (event/make {:watch (fn [_ _ _ ] PrintHelp)
-                 :effect (fn [_ _ _] (print "Unknown command: " command))}))
+  (event/make {:watch (fn [&] PrintHelp)
+                 :effect (fn [&] (print "Unknown command: " command))}))
 
-(event/defevent Exit {:effect (fn [_ _ _] (print "Bye!") (os/exit))})
+(event/defevent Exit {:effect (fn [&] (print "Bye!") (os/exit))})
