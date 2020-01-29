@@ -2,6 +2,19 @@
 (import ../shawn :as shawn)
 (import ../shawn/event :as event)
 
+(deftest "store"
+  (test "init-store" (shawn/init-store))
+  (test "init-store with state"
+        (= (get-in (shawn/init-store @{:counter 1}) [:state :counter]) 1))
+  (test "init-store with wrong state"
+        (match (protect (shawn/init-store {:counter 1}))
+               [false (err (= err "State must be table"))] true ))
+    (test "init-store with opts"
+        (= ((shawn/init-store @{:counter 1} :tick 0.1) :tick) 0.1))
+  (test "init-store with wrong opts"
+        (match (protect (shawn/init-store @{:counter 1} :tick))
+               [false (err (= err "Options must be even count pairs of key and value"))] true)))
+
 (deftest "events"
   (test "make-event"
         (do
