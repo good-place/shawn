@@ -41,6 +41,7 @@
   {:update (fn [_ state] (update state :test |(string $ "t")))})
 
 (def hard-work (os/sleep 0.001))
+
 # Could be used as worker template
 (defn worker [m]
   (with [_ [:fin (thread/receive math/inf)] |(:send m $)]

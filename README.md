@@ -22,6 +22,7 @@ You will be presented with command prompt, type `h` for help on other commands.
 
 ## TODOs
 
+- [ ] @todo add on-error handler
 - [ ] @todo add basic documentation
 - [ ] @todo add combined and error event test
 - [ ] @todo write down philosophy and tech
