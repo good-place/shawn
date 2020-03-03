@@ -19,7 +19,7 @@
                 t (get-in stream [ti 1])]
             (:close t)
             (array/remove stream ti)))
-        [true event] (do (return [id thread]) (:transact store event))
+        [true evt] (do (return [id thread]) (:transact store (event/make evt)))
         [false _] (return [id thread])))))
 
 (defn- _notify [store]
