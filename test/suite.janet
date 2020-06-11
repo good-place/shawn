@@ -8,12 +8,12 @@
         (= (get-in (shawn/init-store @{:counter 1}) [:state :counter]) 1))
   (test "init-store with wrong state"
         (match (protect (shawn/init-store {:counter 1}))
-               [false (err (= err "State must be table"))] true ))
-    (test "init-store with opts"
+          [false (err (= err "State must be table"))] true))
+  (test "init-store with opts"
         (= ((shawn/init-store @{:counter 1} :tick 0.1) :tick) 0.1))
   (test "init-store with wrong opts"
         (match (protect (shawn/init-store @{:counter 1} :tick))
-               [false (err (= err "Options must be even count pairs of key and value"))] true)))
+          [false (err (= err "Options must be even count pairs of key and value"))] true)))
 
 (deftest "events"
   (test "make-event"
@@ -35,19 +35,19 @@
 
 
 (event/defevent TestUpdateEvent
-  {:update (fn [_ state] (put state :test "Test"))})
+                {:update (fn [_ state] (put state :test "Test"))})
 
 (event/defevent TesttUpdateEvent
-  {:update (fn [_ state] (update state :test |(string $ "t")))})
+                {:update (fn [_ state] (update state :test |(string $ "t")))})
 
 (def hard-work (os/sleep 0.001))
 
 # Could be used as worker template
 (defn worker [m]
   (with [_ [:fin (thread/receive math/inf)] |(:send m $)]
-     hard-work
-     (:send m TesttUpdateEvent)
-     hard-work))
+    hard-work
+    (:send m TesttUpdateEvent)
+    hard-work))
 
 (deftest "transact"
   (test "one update event"
@@ -66,19 +66,19 @@
           (:transact store TestEffectEvent)
           ok))
   (test "many watch events"
-       (let [store (shawn/init-store)]
-         (event/defevent TestWatchEvent {:watch (fn [_ _ _] [TestUpdateEvent TesttUpdateEvent TesttUpdateEvent])})
-         (:transact store TestWatchEvent)
-         (deep= (store :state) @{:test "Testtt"})))
+        (let [store (shawn/init-store)]
+          (event/defevent TestWatchEvent {:watch (fn [_ _ _] [TestUpdateEvent TesttUpdateEvent TesttUpdateEvent])})
+          (:transact store TestWatchEvent)
+          (deep= (store :state) @{:test "Testtt"})))
   (test "one fiber event"
         (let [store (shawn/init-store)]
           (event/defevent TestFiberEvent
-            {:watch
-             (fn [_ _ _]
-               (coro
-                (yield TestUpdateEvent)
-                (for _ 0 5 (yield TesttUpdateEvent))
-                TesttUpdateEvent))})
+                          {:watch
+                           (fn [_ _ _]
+                             (coro
+                               (yield TestUpdateEvent)
+                               (for _ 0 5 (yield TesttUpdateEvent))
+                               TesttUpdateEvent))})
           (:transact store TestFiberEvent)
           (deep= (store :state) @{:test "Testtttttt"})))
   (test "one thread event"
@@ -99,11 +99,11 @@
   (test "error event"
         (let [store (shawn/init-store)]
           (match (protect (:transact store {}))
-                 [false err] (string/has-prefix? "Only Events are transactable. Got: " err))))
+            [false err] (string/has-prefix? "Only Events are transactable. Got: " err))))
   (test "watch error event"
         (let [store (shawn/init-store)]
           (match (protect (:transact store (event/make {:watch (fn [_ _ _] {})})))
-                 [false err] (string/has-prefix? "Only Event, Array of Events, Fiber and Thread are watchable. Got:" err)))))
+            [false err] (string/has-prefix? "Only Event, Array of Events, Fiber and Thread are watchable. Got:" err)))))
 
 (deftest "observers"
   (test "observe"

@@ -2,10 +2,10 @@
 (import shawn/event)
 
 (event/defevent ZeroAmount
-  {:update (fn [_ state] (put state :amount 0))})
+                {:update (fn [_ state] (put state :amount 0))})
 
 (event/defevent ZeroQuality
-  {:update (fn [_ state] (put state :quality 0))})
+                {:update (fn [_ state] (put state :quality 0))})
 
 (defn increase-amount [amount]
   (event/make {:update (fn [_ state] (update state :amount |(+ amount $)))}))
@@ -14,10 +14,10 @@
   (event/make {:update (fn [_ state] (update state :amount |(- $ amount)))}))
 
 (event/defevent ZeroAmountAndIncrease
-  {:watch (fn [&] [ZeroAmount (increase-amount 1)])})
+                {:watch (fn [&] [ZeroAmount (increase-amount 1)])})
 
 (event/defevent PrepareState
-  {:watch (fn [&] [ZeroAmountAndIncrease ZeroQuality])})
+                {:watch (fn [&] [ZeroAmountAndIncrease ZeroQuality])})
 
 (event/defevent MillionDown {:effect (fn [&] (print ">>>>> Million down"))})
 
@@ -31,17 +31,17 @@
   (:send m [:fin tid]))
 
 (event/defevent AddThreadRandom
-  {:watch (fn [&] (thread/new worker))
-   :effect (fn [&] (print "Hardest computing"))})
+                {:watch (fn [&] (thread/new worker))
+                 :effect (fn [&] (print "Hardest computing"))})
 
 (event/defevent AddRandom
-  {:watch
-   (fn [&]
-     (coro
-       (var res 0)
-       (loop [_ :range [0 (* (math/random) 1_000_000)]] (+= res (math/random)))
-       (increase-amount res)))
-   :effect (fn [&] (print "Hard computing"))})
+                {:watch
+                 (fn [&]
+                   (coro
+                     (var res 0)
+                     (loop [_ :range [0 (* (math/random) 1_000_000)]] (+= res (math/random)))
+                     (increase-amount res)))
+                 :effect (fn [&] (print "Hard computing"))})
 
 (defn add-many-randoms [amount]
   (event/make {:watch (fn [&] (seq [_ :range [0 amount]] AddRandom))}))
@@ -50,12 +50,12 @@
   (event/make {:watch (fn [&] (seq [_ :range [0 amount]] AddThreadRandom))}))
 
 (event/defevent PrintState
-  {:effect (fn [_ state _] (prin "State: ") (pp state))})
+                {:effect (fn [_ state _] (prin "State: ") (pp state))})
 
 (event/defevent PrintHelp
-  {:effect (fn [&]
-             (print
-```
+                {:effect (fn [&]
+                           (print
+                             ```
 
 Help:
 0 make amount zero
@@ -67,11 +67,10 @@ p print state
 h print this help
 q quit console
 
-```
-            ))})
+```))})
 
 (defn unknown-command [command]
   (event/make {:watch (fn [&] PrintHelp)
-                 :effect (fn [&] (print "Unknown command: " command))}))
+               :effect (fn [&] (print "Unknown command: " command))}))
 
 (event/defevent Exit {:effect (fn [&] (print "Bye!") (os/exit))})

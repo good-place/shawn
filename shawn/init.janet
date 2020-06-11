@@ -87,4 +87,3 @@
   (assert (table? state) "State must be table")
   (assert (even? (length opts)) "Options must be even count pairs of key and value")
   (-> @{:state state} (table/setproto Store) (merge-into (table ;opts))))
-

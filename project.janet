@@ -4,4 +4,3 @@
   :dependencies ["https://github.com/joy-framework/tester"])
 
 (declare-source :source ["shawn/"])
-
