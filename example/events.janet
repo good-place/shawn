@@ -1,5 +1,5 @@
-(import shawn)
-(import shawn/event)
+(import /shawn)
+(import /shawn/event)
 
 (event/defevent ZeroAmount
                 {:update (fn [_ state] (put state :amount 0))})

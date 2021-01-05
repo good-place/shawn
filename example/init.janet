@@ -1,6 +1,6 @@
-(import shawn)
-(import example/events)
-(import example/parser)
+(import /shawn)
+(import /example/events)
+(import /example/parser)
 
 (def- store (shawn/init-store))
 
