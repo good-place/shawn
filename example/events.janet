@@ -56,18 +56,16 @@
                 {:effect (fn [&]
                            (print
                              ```
-
-Help:
-0 make amount zero
-+ [num] add 1 or num to amount
-- [num] substract 1 or num from amount
-r [num] compute and add 1 or num random numbers to amount
-t [num] compute and add 1 or num random numbers to amount in threads
-p print state
-h print this help
-q quit console
-
-```))})
+                             Available commands:
+                               0 make amount zero
+                               + [num] add 1 or num to amount
+                               - [num] substract 1 or num from amount
+                               r [num] compute and add 1 or num random numbers to amount
+                               t [num] compute and add 1 or num random numbers to amount in threads
+                               p print state
+                               h print this help
+                               q quit console
+                             ```))})
 
 (defn unknown-command [command]
   (event/make {:watch (fn [&] PrintHelp)

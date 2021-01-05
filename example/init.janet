@@ -13,7 +13,7 @@
 
 (:transact store events/PrepareState)
 
-(while true
+(forever
   (def readout (-> "Command [+ - 0 r t p q h]: " getline string/trim))
   (:transact store
              (match (parser/parse-command readout)

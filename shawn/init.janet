@@ -86,6 +86,7 @@
   @{:tick (/ 60)
     :transact transact
     :observe observe
+    :processing false
     :_old-state nil
     :_stream @[]
     :_observers @[]
