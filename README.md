@@ -1,3 +1,7 @@
+# This repository is deprecated
+
+Please use latest version from [SourceHut](https://git.sr.ht/~pepe/shawn)
+
 # shawn
 
 Reactive streams for Janet programming language.
